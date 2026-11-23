@@ -1,25 +1,27 @@
 {
-  "version": "0.4.1",
-  "updated_at": "2026-11-23T17:21:56.945107+09:00",
+  "version": "0.4.2",
+  "updated_at": "2026-11-23T17:37:51.231489+09:00",
   "universe": 2721,
-  "processed": 2459,
+  "processed": 2527,
   "errors": 0,
-  "skipped": 262,
+  "skipped": 194,
   "skip_reason_counts": {
-    "0 이하 가격 존재": 211,
+    "최신 시세/거래량 비정상": 114,
     "125거래일 미만": 50,
-    "마지막 시세일 거래량 0": 1
+    "최근 20거래기록 내 비정상 시세": 29,
+    "비거래일로 분류 불가한 가격 이상": 1
   },
   "price_diagnostic_summary": {
-    "affected_symbols": 211,
+    "affected_symbols": 137,
+    "recovered_historical_symbols": 89,
     "latest_day_affected": 113,
-    "historical_only": 98
+    "historical_only": 24
   },
   "date_counts": {
-    "2026-11-23": 2459
+    "2026-11-23": 2527
   },
   "latest_data_date": "2026-11-23",
   "eligible": 0,
   "workers": 4,
-  "note": "최신 날짜는 종목 데이터 중 최대 날짜 기준이며 공식 거래일 검증은 별도 필요. 업종 상대강도 미측정."
+  "note": "0 OHLC·0 거래량 기록은 최근 20개 기록 밖에서만 제거. 거래정지/재개 종목은 별도 검증 필요. 최신 날짜는 종목 데이터 중 최대 날짜 기준이며 공식 거래일 검증은 별도 필요. 업종 상대강도 미측정."
 }
