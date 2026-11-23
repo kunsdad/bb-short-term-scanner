@@ -8489,6 +8489,14 @@
     ]
   },
   {
+    "code": "487400",
+    "name": "케이앤에스아이앤씨",
+    "reason": "125거래일 미만",
+    "rows": 68,
+    "first_date": "2026-08-13",
+    "last_date": "2026-11-23"
+  },
+  {
     "code": "089150",
     "name": "케이씨티",
     "reason": "0 이하 가격 존재",
@@ -8581,14 +8589,6 @@
         }
       }
     ]
-  },
-  {
-    "code": "487400",
-    "name": "케이앤에스아이앤씨",
-    "reason": "125거래일 미만",
-    "rows": 68,
-    "first_date": "2026-08-13",
-    "last_date": "2026-11-23"
   },
   {
     "code": "208860",
@@ -10664,100 +10664,6 @@
     ]
   },
   {
-    "code": "469750",
-    "name": "아이비젼웍스",
-    "reason": "0 이하 가격 존재",
-    "rows": 200,
-    "first_date": "2026-01-28",
-    "last_date": "2026-11-23",
-    "bad_price_days": 12,
-    "bad_price_columns": {
-      "Open": 12,
-      "High": 12,
-      "Low": 12
-    },
-    "bad_price_first_date": "2026-09-14",
-    "bad_price_last_date": "2026-10-01",
-    "bad_price_on_latest_day": false,
-    "bad_price_samples": [
-      {
-        "date": "2026-09-23",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 4955.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-09-28",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 4955.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-09-29",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 4955.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-09-30",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 4955.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-10-01",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 4955.0,
-          "Volume": 0.0
-        }
-      }
-    ]
-  },
-  {
     "code": "031860",
     "name": "디에이치엑스컴퍼니",
     "reason": "0 이하 가격 존재",
@@ -10846,6 +10752,100 @@
           "High": 0.0,
           "Low": 0.0,
           "Close": 6930.0,
+          "Volume": 0.0
+        }
+      }
+    ]
+  },
+  {
+    "code": "469750",
+    "name": "아이비젼웍스",
+    "reason": "0 이하 가격 존재",
+    "rows": 200,
+    "first_date": "2026-01-28",
+    "last_date": "2026-11-23",
+    "bad_price_days": 12,
+    "bad_price_columns": {
+      "Open": 12,
+      "High": 12,
+      "Low": 12
+    },
+    "bad_price_first_date": "2026-09-14",
+    "bad_price_last_date": "2026-10-01",
+    "bad_price_on_latest_day": false,
+    "bad_price_samples": [
+      {
+        "date": "2026-09-23",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 4955.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-09-28",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 4955.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-09-29",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 4955.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-09-30",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 4955.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-10-01",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 4955.0,
           "Volume": 0.0
         }
       }
@@ -13440,14 +13440,6 @@
     ]
   },
   {
-    "code": "0127E0",
-    "name": "한화플러스제6호스팩",
-    "reason": "125거래일 미만",
-    "rows": 17,
-    "first_date": "2026-10-30",
-    "last_date": "2026-11-23"
-  },
-  {
     "code": "101000",
     "name": "KS인더스트리",
     "reason": "0 이하 가격 존재",
@@ -13480,6 +13472,14 @@
         }
       }
     ]
+  },
+  {
+    "code": "0127E0",
+    "name": "한화플러스제6호스팩",
+    "reason": "125거래일 미만",
+    "rows": 17,
+    "first_date": "2026-10-30",
+    "last_date": "2026-11-23"
   },
   {
     "code": "012340",
@@ -13994,40 +13994,6 @@
     ]
   },
   {
-    "code": "024890",
-    "name": "대원화성",
-    "reason": "0 이하 가격 존재",
-    "rows": 200,
-    "first_date": "2026-01-28",
-    "last_date": "2026-11-23",
-    "bad_price_days": 1,
-    "bad_price_columns": {
-      "Open": 1,
-      "High": 1,
-      "Low": 1
-    },
-    "bad_price_first_date": "2026-08-13",
-    "bad_price_last_date": "2026-08-13",
-    "bad_price_on_latest_day": false,
-    "bad_price_samples": [
-      {
-        "date": "2026-08-13",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 2640.0,
-          "Volume": 0.0
-        }
-      }
-    ]
-  },
-  {
     "code": "465770",
     "name": "STX그린로지스",
     "reason": "0 이하 가격 존재",
@@ -14056,6 +14022,40 @@
           "High": 0.0,
           "Low": 0.0,
           "Close": 3800.0,
+          "Volume": 0.0
+        }
+      }
+    ]
+  },
+  {
+    "code": "024890",
+    "name": "대원화성",
+    "reason": "0 이하 가격 존재",
+    "rows": 200,
+    "first_date": "2026-01-28",
+    "last_date": "2026-11-23",
+    "bad_price_days": 1,
+    "bad_price_columns": {
+      "Open": 1,
+      "High": 1,
+      "Low": 1
+    },
+    "bad_price_first_date": "2026-08-13",
+    "bad_price_last_date": "2026-08-13",
+    "bad_price_on_latest_day": false,
+    "bad_price_samples": [
+      {
+        "date": "2026-08-13",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 2640.0,
           "Volume": 0.0
         }
       }
@@ -15386,6 +15386,40 @@
     ]
   },
   {
+    "code": "475250",
+    "name": "하나33호스팩",
+    "reason": "0 이하 가격 존재",
+    "rows": 200,
+    "first_date": "2026-01-28",
+    "last_date": "2026-11-23",
+    "bad_price_days": 1,
+    "bad_price_columns": {
+      "Open": 1,
+      "High": 1,
+      "Low": 1
+    },
+    "bad_price_first_date": "2026-11-19",
+    "bad_price_last_date": "2026-11-19",
+    "bad_price_on_latest_day": false,
+    "bad_price_samples": [
+      {
+        "date": "2026-11-19",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 2095.0,
+          "Volume": 0.0
+        }
+      }
+    ]
+  },
+  {
     "code": "308100",
     "name": "형지글로벌",
     "reason": "0 이하 가격 존재",
@@ -15480,74 +15514,6 @@
     ]
   },
   {
-    "code": "475250",
-    "name": "하나33호스팩",
-    "reason": "0 이하 가격 존재",
-    "rows": 200,
-    "first_date": "2026-01-28",
-    "last_date": "2026-11-23",
-    "bad_price_days": 1,
-    "bad_price_columns": {
-      "Open": 1,
-      "High": 1,
-      "Low": 1
-    },
-    "bad_price_first_date": "2026-11-19",
-    "bad_price_last_date": "2026-11-19",
-    "bad_price_on_latest_day": false,
-    "bad_price_samples": [
-      {
-        "date": "2026-11-19",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 2095.0,
-          "Volume": 0.0
-        }
-      }
-    ]
-  },
-  {
-    "code": "474930",
-    "name": "신한제13호스팩",
-    "reason": "0 이하 가격 존재",
-    "rows": 200,
-    "first_date": "2026-01-28",
-    "last_date": "2026-11-23",
-    "bad_price_days": 1,
-    "bad_price_columns": {
-      "Open": 1,
-      "High": 1,
-      "Low": 1
-    },
-    "bad_price_first_date": "2026-11-17",
-    "bad_price_last_date": "2026-11-17",
-    "bad_price_on_latest_day": false,
-    "bad_price_samples": [
-      {
-        "date": "2026-11-17",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 2095.0,
-          "Volume": 0.0
-        }
-      }
-    ]
-  },
-  {
     "code": "079970",
     "name": "투비소프트",
     "reason": "0 이하 가격 존재",
@@ -15636,6 +15602,40 @@
           "High": 0.0,
           "Low": 0.0,
           "Close": 596.0,
+          "Volume": 0.0
+        }
+      }
+    ]
+  },
+  {
+    "code": "474930",
+    "name": "신한제13호스팩",
+    "reason": "0 이하 가격 존재",
+    "rows": 200,
+    "first_date": "2026-01-28",
+    "last_date": "2026-11-23",
+    "bad_price_days": 1,
+    "bad_price_columns": {
+      "Open": 1,
+      "High": 1,
+      "Low": 1
+    },
+    "bad_price_first_date": "2026-11-17",
+    "bad_price_last_date": "2026-11-17",
+    "bad_price_on_latest_day": false,
+    "bad_price_samples": [
+      {
+        "date": "2026-11-17",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 2095.0,
           "Volume": 0.0
         }
       }
