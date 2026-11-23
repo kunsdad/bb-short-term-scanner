@@ -20,53 +20,78 @@ def universe():
     stocks[code] = stocks[code].astype(str).str.zfill(6)
     return stocks.rename(columns={code:'Code'})[['Code','Name','Market']].drop_duplicates('Code')
 
-def validate_history(df):
-    """Return (reason, details). Do not silently loosen trading-data checks."""
+def prepare_history(df):
+    """Validate source records, dropping only explicit zero-volume/no-OHLC rows.
+
+    Suspended/nontrading rows are never synthesized. Any questionable positive-volume
+    record, recent 20-row anomaly, or insufficient clean history remains excluded.
+    """
     if df is None or df.empty:
-        return '시세 데이터 없음', {'rows': 0}
-    d = df.sort_index()
+        return None, '시세 데이터 없음', {'rows': 0}
+    d = df.sort_index().copy()
     details = {'rows': len(d), 'first_date': str(d.index[0].date()),
                'last_date': str(d.index[-1].date())}
-    if len(d) < 125:
-        return '125거래일 미만', details
     cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     missing = [x for x in cols if x not in d.columns]
     if missing:
         details['columns'] = missing
-        return '필수 시세 열 누락', details
-    recent = d[cols].tail(125).apply(pd.to_numeric, errors='coerce')
-    nan_counts = recent.isna().sum()
-    if nan_counts.any():
-        details['nan_counts'] = {k: int(v) for k, v in nan_counts.items() if v}
-        return '가격/거래량 결측치', details
-    if (recent[['Open','High','Low','Close']] <= 0).any().any():
-        price_cols = ['Open', 'High', 'Low', 'Close']
-        invalid = (recent[price_cols] <= 0)
-        bad = recent.loc[invalid.any(axis=1)]
-        details['bad_price_days'] = int(len(bad))
-        details['bad_price_columns'] = {c: int(invalid[c].sum()) for c in price_cols if invalid[c].any()}
+        return None, '필수 시세 열 누락', details
+    d[cols] = d[cols].apply(pd.to_numeric, errors='coerce')
+    if len(d) < 125:
+        return None, '125거래일 미만', details
+    recent = d.tail(125)
+    if recent[cols].isna().any().any():
+        details['nan_counts'] = {k:int(v) for k,v in recent[cols].isna().sum().items() if v}
+        return None, '가격/거래량 결측치', details
+    invalid = (d[['Open','High','Low','Close']] <= 0).any(axis=1)
+    # Zero-OHLC with positive close and zero volume is a nontrading record,
+    # not a genuine price candle. Never repair it with fabricated prices.
+    no_trade = ((d[['Open','High','Low']] == 0).all(axis=1) &
+                (d['Close'] > 0) & (d['Volume'] == 0))
+    bad = recent.loc[invalid.tail(125)]
+    if len(bad):
+        details['bad_price_days'] = len(bad)
         details['bad_price_first_date'] = str(bad.index[0].date())
         details['bad_price_last_date'] = str(bad.index[-1].date())
-        details['bad_price_on_latest_day'] = bool(invalid.iloc[-1].any())
+        details['bad_price_on_latest_day'] = bool(invalid.iloc[-1])
+        details['bad_price_columns'] = {c:int((bad[c] <= 0).sum()) for c in ['Open','High','Low','Close'] if (bad[c] <= 0).any()}
         details['bad_price_samples'] = [
-            {'date': str(day.date()), 'invalid_columns': [c for c in price_cols if row[c] <= 0],
-             'ohlcv': {c: float(row[c]) for c in cols}}
-            for day, row in bad.tail(5).iterrows()
-        ]
-        return '0 이하 가격 존재', details
-    if (recent['High'] < recent[['Open','Close','Low']].max(axis=1)).any():
-        return '고가 OHLC 불일치', details
-    if (recent['Low'] > recent[['Open','Close','High']].min(axis=1)).any():
-        return '저가 OHLC 불일치', details
-    if (recent['Volume'] < 0).any():
-        return '음수 거래량', details
-    if recent['Volume'].iloc[-1] == 0:
-        details['zero_volume_days_125'] = int((recent['Volume'] == 0).sum())
-        return '마지막 시세일 거래량 0', details
-    return None, details
+            {'date':str(day.date()), 'invalid_columns':[c for c in ['Open','High','Low','Close'] if row[c] <= 0],
+             'ohlcv':{c:float(row[c]) for c in cols}}
+            for day,row in bad.tail(5).iterrows()]
+    if invalid.iloc[-1] or d['Volume'].iloc[-1] <= 0:
+        return None, '최신 시세/거래량 비정상', details
+    if invalid.tail(20).any() or (d['Volume'].tail(20) <= 0).any():
+        return None, '최근 20거래기록 내 비정상 시세', details
+    if (invalid & ~no_trade).any():
+        return None, '비거래일로 분류 불가한 가격 이상', details
+    if (d['Volume'] < 0).any():
+        return None, '음수 거래량', details
+    clean = d.loc[~no_trade].copy()
+    if len(clean) < 125:
+        details['valid_rows'] = len(clean)
+        return None, '정상 시세 125개 미만', details
+    clean = clean.tail(125)
+    if clean[cols].isna().any().any():
+        return None, '정상 구간 결측치', details
+    if (clean[['Open','High','Low','Close']] <= 0).any().any():
+        return None, '정상 구간 가격 이상', details
+    if (clean['High'] < clean[['Open','Close','Low']].max(axis=1)).any():
+        return None, '고가 OHLC 불일치', details
+    if (clean['Low'] > clean[['Open','Close','High']].min(axis=1)).any():
+        return None, '저가 OHLC 불일치', details
+    details['excluded_nontrading_rows'] = int(no_trade.sum())
+    details['valid_rows'] = len(clean)
+    details['data_quality'] = '과거 비거래 기록 제외' if no_trade.any() else '정상'
+    return clean, None, details
 
 
-def score(df):
+def validate_history(df):
+    _, reason, details = prepare_history(df)
+    return reason, details
+
+
+def score(df, data_quality='정상'):
     if len(df) < 125: return None
     d = df.copy().sort_index()
     for c in ['Open','High','Low','Close','Volume']:
@@ -113,7 +138,7 @@ def score(df):
     if stop<=0 or stop>=entry: reasons.append('손절선 부적합')
     if not resistances: reasons.append('상방 목표가 없음')
     eligible=not reasons
-    return dict(date=str(d.index[-1].date()),close=round(entry,2),rsi=round(float(rsi.iloc[-1]),1),volume_ratio=round(volratio,2),turnover_20d=round(float(amount)),score=points,eligible=eligible,bandwalk=bandwalk,reentry=reentered,entry=round(entry,2),target1=round(target1,2),target2=round(target2,2),stop=round(stop,2),risk_reward=round((target1-entry)/(entry-stop),2) if 0<stop<entry and np.isfinite(target1) else None,exclusion_reason='; '.join(reasons),ma5=round(float(ma5.iloc[-1]),2),ma20=round(float(mid.iloc[-1]),2),sector_strength='미측정',target1_basis='MA5/MA20 상방 저항',data_quality='정상')
+    return dict(date=str(d.index[-1].date()),close=round(entry,2),rsi=round(float(rsi.iloc[-1]),1),volume_ratio=round(volratio,2),turnover_20d=round(float(amount)),score=points,eligible=eligible,bandwalk=bandwalk,reentry=reentered,entry=round(entry,2),target1=round(target1,2),target2=round(target2,2),stop=round(stop,2),risk_reward=round((target1-entry)/(entry-stop),2) if 0<stop<entry and np.isfinite(target1) else None,exclusion_reason='; '.join(reasons),ma5=round(float(ma5.iloc[-1]),2),ma20=round(float(mid.iloc[-1]),2),sector_strength='미측정',target1_basis='MA5/MA20 상방 저항',data_quality=data_quality)
 
 def open_cache():
     conn = sqlite3.connect(CACHE)
@@ -160,7 +185,7 @@ def save_prices(conn, code, df):
 
 
 def run():
-    print('BB scan v0.4.1 started', flush=True)
+    print('BB scan v0.4.2 started', flush=True)
     stocks = universe()
     print(f'Universe: {len(stocks)} | workers={WORKERS}', flush=True)
     now = pd.Timestamp.now(tz='Asia/Seoul')
@@ -189,8 +214,8 @@ def run():
                     conn.execute('DELETE FROM prices WHERE code=? AND date<?', (code, cutoff))
                     conn.commit()
                     d = d.tail(200)
-                skip_reason, details = validate_history(d)
-                result = score(d) if skip_reason is None else None
+                clean, skip_reason, details = prepare_history(d)
+                result = score(clean, details.get('data_quality', '정상')) if skip_reason is None else None
                 if result:
                     rows.append(dict(code=code, name=stock.Name, market=stock.Market, **result))
                 else:
@@ -212,21 +237,23 @@ def run():
     data = data.sort_values(['eligible','score','turnover_20d'],ascending=[False,False,False])
     data.to_csv(OUT/'latest.csv',index=False,encoding='utf-8-sig')
     reason_counts = pd.Series([x['reason'] for x in skipped]).value_counts().to_dict() if skipped else {}
-    price_diagnostics = [x for x in skipped if x['reason'] == '0 이하 가격 존재']
+    price_diagnostics = [x for x in skipped if x.get('bad_price_days', 0) > 0]
     (OUT/'price_diagnostics.json').write_text(
         json.dumps(price_diagnostics, ensure_ascii=False, indent=2), encoding='utf-8')
+    quality_recovered = int((data['data_quality'] == '과거 비거래 기록 제외').sum())
     price_summary = {
         'affected_symbols': len(price_diagnostics),
+        'recovered_historical_symbols': quality_recovered,
         'latest_day_affected': sum(bool(x.get('bad_price_on_latest_day')) for x in price_diagnostics),
         'historical_only': sum(not bool(x.get('bad_price_on_latest_day')) for x in price_diagnostics),
     }
     (OUT/'status.json').write_text(json.dumps({
-        'version':'0.4.1', 'updated_at':now.isoformat(), 'universe':len(stocks),
+        'version':'0.4.2', 'updated_at':now.isoformat(), 'universe':len(stocks),
         'processed':len(rows), 'errors':len(errors), 'skipped':len(skipped),
         'skip_reason_counts':reason_counts, 'price_diagnostic_summary':price_summary,
         'date_counts':dates, 'latest_data_date':latest_day,
         'eligible':int(data['eligible'].sum()), 'workers':WORKERS,
-        'note':'최신 날짜는 종목 데이터 중 최대 날짜 기준이며 공식 거래일 검증은 별도 필요. 업종 상대강도 미측정.'
+        'note':'0 OHLC·0 거래량 기록은 최근 20개 기록 밖에서만 제거. 거래정지/재개 종목은 별도 검증 필요. 최신 날짜는 종목 데이터 중 최대 날짜 기준이며 공식 거래일 검증은 별도 필요. 업종 상대강도 미측정.'
     },ensure_ascii=False,indent=2),encoding='utf-8')
     (OUT/'errors.json').write_text(json.dumps(errors,ensure_ascii=False,indent=2),encoding='utf-8')
     (OUT/'skipped.json').write_text(json.dumps(skipped,ensure_ascii=False,indent=2),encoding='utf-8')
