@@ -40,7 +40,19 @@ def validate_history(df):
         details['nan_counts'] = {k: int(v) for k, v in nan_counts.items() if v}
         return '가격/거래량 결측치', details
     if (recent[['Open','High','Low','Close']] <= 0).any().any():
-        details['bad_price_days'] = int((recent[['Open','High','Low','Close']] <= 0).any(axis=1).sum())
+        price_cols = ['Open', 'High', 'Low', 'Close']
+        invalid = (recent[price_cols] <= 0)
+        bad = recent.loc[invalid.any(axis=1)]
+        details['bad_price_days'] = int(len(bad))
+        details['bad_price_columns'] = {c: int(invalid[c].sum()) for c in price_cols if invalid[c].any()}
+        details['bad_price_first_date'] = str(bad.index[0].date())
+        details['bad_price_last_date'] = str(bad.index[-1].date())
+        details['bad_price_on_latest_day'] = bool(invalid.iloc[-1].any())
+        details['bad_price_samples'] = [
+            {'date': str(day.date()), 'invalid_columns': [c for c in price_cols if row[c] <= 0],
+             'ohlcv': {c: float(row[c]) for c in cols}}
+            for day, row in bad.tail(5).iterrows()
+        ]
         return '0 이하 가격 존재', details
     if (recent['High'] < recent[['Open','Close','Low']].max(axis=1)).any():
         return '고가 OHLC 불일치', details
@@ -148,7 +160,7 @@ def save_prices(conn, code, df):
 
 
 def run():
-    print('BB scan v0.4 started', flush=True)
+    print('BB scan v0.4.1 started', flush=True)
     stocks = universe()
     print(f'Universe: {len(stocks)} | workers={WORKERS}', flush=True)
     now = pd.Timestamp.now(tz='Asia/Seoul')
@@ -200,10 +212,18 @@ def run():
     data = data.sort_values(['eligible','score','turnover_20d'],ascending=[False,False,False])
     data.to_csv(OUT/'latest.csv',index=False,encoding='utf-8-sig')
     reason_counts = pd.Series([x['reason'] for x in skipped]).value_counts().to_dict() if skipped else {}
+    price_diagnostics = [x for x in skipped if x['reason'] == '0 이하 가격 존재']
+    (OUT/'price_diagnostics.json').write_text(
+        json.dumps(price_diagnostics, ensure_ascii=False, indent=2), encoding='utf-8')
+    price_summary = {
+        'affected_symbols': len(price_diagnostics),
+        'latest_day_affected': sum(bool(x.get('bad_price_on_latest_day')) for x in price_diagnostics),
+        'historical_only': sum(not bool(x.get('bad_price_on_latest_day')) for x in price_diagnostics),
+    }
     (OUT/'status.json').write_text(json.dumps({
-        'version':'0.4', 'updated_at':now.isoformat(), 'universe':len(stocks),
+        'version':'0.4.1', 'updated_at':now.isoformat(), 'universe':len(stocks),
         'processed':len(rows), 'errors':len(errors), 'skipped':len(skipped),
-        'skip_reason_counts':reason_counts,
+        'skip_reason_counts':reason_counts, 'price_diagnostic_summary':price_summary,
         'date_counts':dates, 'latest_data_date':latest_day,
         'eligible':int(data['eligible'].sum()), 'workers':WORKERS,
         'note':'최신 날짜는 종목 데이터 중 최대 날짜 기준이며 공식 거래일 검증은 별도 필요. 업종 상대강도 미측정.'
