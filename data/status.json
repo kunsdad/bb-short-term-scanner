@@ -1,6 +1,6 @@
 {
-  "version": "0.4",
-  "updated_at": "2026-11-23T16:32:05.674832+09:00",
+  "version": "0.4.1",
+  "updated_at": "2026-11-23T17:00:44.434295+09:00",
   "universe": 2721,
   "processed": 2459,
   "errors": 0,
@@ -9,6 +9,11 @@
     "0 이하 가격 존재": 211,
     "125거래일 미만": 50,
     "마지막 시세일 거래량 0": 1
+  },
+  "price_diagnostic_summary": {
+    "affected_symbols": 211,
+    "latest_day_affected": 113,
+    "historical_only": 98
   },
   "date_counts": {
     "2026-11-23": 2459
