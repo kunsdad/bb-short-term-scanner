@@ -20,6 +20,40 @@ def universe():
     stocks[code] = stocks[code].astype(str).str.zfill(6)
     return stocks.rename(columns={code:'Code'})[['Code','Name','Market']].drop_duplicates('Code')
 
+def validate_history(df):
+    """Return (reason, details). Do not silently loosen trading-data checks."""
+    if df is None or df.empty:
+        return '시세 데이터 없음', {'rows': 0}
+    d = df.sort_index()
+    details = {'rows': len(d), 'first_date': str(d.index[0].date()),
+               'last_date': str(d.index[-1].date())}
+    if len(d) < 125:
+        return '125거래일 미만', details
+    cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+    missing = [x for x in cols if x not in d.columns]
+    if missing:
+        details['columns'] = missing
+        return '필수 시세 열 누락', details
+    recent = d[cols].tail(125).apply(pd.to_numeric, errors='coerce')
+    nan_counts = recent.isna().sum()
+    if nan_counts.any():
+        details['nan_counts'] = {k: int(v) for k, v in nan_counts.items() if v}
+        return '가격/거래량 결측치', details
+    if (recent[['Open','High','Low','Close']] <= 0).any().any():
+        details['bad_price_days'] = int((recent[['Open','High','Low','Close']] <= 0).any(axis=1).sum())
+        return '0 이하 가격 존재', details
+    if (recent['High'] < recent[['Open','Close','Low']].max(axis=1)).any():
+        return '고가 OHLC 불일치', details
+    if (recent['Low'] > recent[['Open','Close','High']].min(axis=1)).any():
+        return '저가 OHLC 불일치', details
+    if (recent['Volume'] < 0).any():
+        return '음수 거래량', details
+    if recent['Volume'].iloc[-1] == 0:
+        details['zero_volume_days_125'] = int((recent['Volume'] == 0).sum())
+        return '마지막 시세일 거래량 0', details
+    return None, details
+
+
 def score(df):
     if len(df) < 125: return None
     d = df.copy().sort_index()
@@ -114,7 +148,7 @@ def save_prices(conn, code, df):
 
 
 def run():
-    print('BB scan v0.3 started', flush=True)
+    print('BB scan v0.4 started', flush=True)
     stocks = universe()
     print(f'Universe: {len(stocks)} | workers={WORKERS}', flush=True)
     now = pd.Timestamp.now(tz='Asia/Seoul')
@@ -143,11 +177,12 @@ def run():
                     conn.execute('DELETE FROM prices WHERE code=? AND date<?', (code, cutoff))
                     conn.commit()
                     d = d.tail(200)
-                result = score(d)
+                skip_reason, details = validate_history(d)
+                result = score(d) if skip_reason is None else None
                 if result:
                     rows.append(dict(code=code, name=stock.Name, market=stock.Market, **result))
                 else:
-                    skipped.append({'code':code,'name':stock.Name,'reason':'가격/거래량 이상, 거래정지 또는 125거래일 미만'})
+                    skipped.append({'code':code,'name':stock.Name,'reason':skip_reason or '점수 계산 불가', **details})
             except Exception as exc:
                 errors.append({'code':code,'name':stock.Name,'error':str(exc)[:200]})
             if idx % 50 == 0 or idx == len(stocks):
@@ -164,15 +199,18 @@ def run():
     data.loc[stale, 'exclusion_reason'] = data.loc[stale, 'exclusion_reason'].fillna('').apply(lambda x: (x+'; ' if x else '')+'최신 데이터 날짜 불일치')
     data = data.sort_values(['eligible','score','turnover_20d'],ascending=[False,False,False])
     data.to_csv(OUT/'latest.csv',index=False,encoding='utf-8-sig')
+    reason_counts = pd.Series([x['reason'] for x in skipped]).value_counts().to_dict() if skipped else {}
     (OUT/'status.json').write_text(json.dumps({
-        'version':'0.3', 'updated_at':now.isoformat(), 'universe':len(stocks),
+        'version':'0.4', 'updated_at':now.isoformat(), 'universe':len(stocks),
         'processed':len(rows), 'errors':len(errors), 'skipped':len(skipped),
+        'skip_reason_counts':reason_counts,
         'date_counts':dates, 'latest_data_date':latest_day,
         'eligible':int(data['eligible'].sum()), 'workers':WORKERS,
         'note':'최신 날짜는 종목 데이터 중 최대 날짜 기준이며 공식 거래일 검증은 별도 필요. 업종 상대강도 미측정.'
     },ensure_ascii=False,indent=2),encoding='utf-8')
     (OUT/'errors.json').write_text(json.dumps(errors,ensure_ascii=False,indent=2),encoding='utf-8')
     (OUT/'skipped.json').write_text(json.dumps(skipped,ensure_ascii=False,indent=2),encoding='utf-8')
+    print(f'Skip reasons: {reason_counts}', flush=True)
     print(f'Completed | scored={len(rows)} skipped={len(skipped)} errors={len(errors)} eligible={int(data.eligible.sum())} | latest={latest_day}', flush=True)
 
 
