@@ -29,5 +29,5 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add data/latest.csv data/status.json data/errors.json data/skipped.json data/history.sqlite
+          git add data/latest.csv data/status.json data/errors.json data/skipped.json data/price_diagnostics.json data/history.sqlite
           git diff --cached --quiet || (git commit -m "Daily BB scan" && git push)
