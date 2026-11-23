@@ -9838,100 +9838,6 @@
     ]
   },
   {
-    "code": "015260",
-    "name": "에이엔피",
-    "reason": "최신 시세/거래량 비정상",
-    "rows": 200,
-    "first_date": "2026-01-28",
-    "last_date": "2026-11-23",
-    "bad_price_days": 22,
-    "bad_price_first_date": "2026-08-10",
-    "bad_price_last_date": "2026-11-23",
-    "bad_price_on_latest_day": true,
-    "bad_price_columns": {
-      "Open": 22,
-      "High": 22,
-      "Low": 22
-    },
-    "bad_price_samples": [
-      {
-        "date": "2026-11-17",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 171.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-11-18",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 171.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-11-19",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 171.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-11-20",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 171.0,
-          "Volume": 0.0
-        }
-      },
-      {
-        "date": "2026-11-23",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 171.0,
-          "Volume": 0.0
-        }
-      }
-    ]
-  },
-  {
     "code": "087260",
     "name": "모바일어플라이언스",
     "reason": "최신 시세/거래량 비정상",
@@ -10020,6 +9926,100 @@
           "High": 0.0,
           "Low": 0.0,
           "Close": 247.0,
+          "Volume": 0.0
+        }
+      }
+    ]
+  },
+  {
+    "code": "015260",
+    "name": "에이엔피",
+    "reason": "최신 시세/거래량 비정상",
+    "rows": 200,
+    "first_date": "2026-01-28",
+    "last_date": "2026-11-23",
+    "bad_price_days": 22,
+    "bad_price_first_date": "2026-08-10",
+    "bad_price_last_date": "2026-11-23",
+    "bad_price_on_latest_day": true,
+    "bad_price_columns": {
+      "Open": 22,
+      "High": 22,
+      "Low": 22
+    },
+    "bad_price_samples": [
+      {
+        "date": "2026-11-17",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 171.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-11-18",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 171.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-11-19",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 171.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-11-20",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 171.0,
+          "Volume": 0.0
+        }
+      },
+      {
+        "date": "2026-11-23",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 171.0,
           "Volume": 0.0
         }
       }
@@ -10248,40 +10248,6 @@
     ]
   },
   {
-    "code": "474930",
-    "name": "신한제13호스팩",
-    "reason": "최근 20거래기록 내 비정상 시세",
-    "rows": 200,
-    "first_date": "2026-01-28",
-    "last_date": "2026-11-23",
-    "bad_price_days": 1,
-    "bad_price_first_date": "2026-11-17",
-    "bad_price_last_date": "2026-11-17",
-    "bad_price_on_latest_day": false,
-    "bad_price_columns": {
-      "Open": 1,
-      "High": 1,
-      "Low": 1
-    },
-    "bad_price_samples": [
-      {
-        "date": "2026-11-17",
-        "invalid_columns": [
-          "Open",
-          "High",
-          "Low"
-        ],
-        "ohlcv": {
-          "Open": 0.0,
-          "High": 0.0,
-          "Low": 0.0,
-          "Close": 2095.0,
-          "Volume": 0.0
-        }
-      }
-    ]
-  },
-  {
     "code": "079970",
     "name": "투비소프트",
     "reason": "최신 시세/거래량 비정상",
@@ -10370,6 +10336,40 @@
           "High": 0.0,
           "Low": 0.0,
           "Close": 596.0,
+          "Volume": 0.0
+        }
+      }
+    ]
+  },
+  {
+    "code": "474930",
+    "name": "신한제13호스팩",
+    "reason": "최근 20거래기록 내 비정상 시세",
+    "rows": 200,
+    "first_date": "2026-01-28",
+    "last_date": "2026-11-23",
+    "bad_price_days": 1,
+    "bad_price_first_date": "2026-11-17",
+    "bad_price_last_date": "2026-11-17",
+    "bad_price_on_latest_day": false,
+    "bad_price_columns": {
+      "Open": 1,
+      "High": 1,
+      "Low": 1
+    },
+    "bad_price_samples": [
+      {
+        "date": "2026-11-17",
+        "invalid_columns": [
+          "Open",
+          "High",
+          "Low"
+        ],
+        "ohlcv": {
+          "Open": 0.0,
+          "High": 0.0,
+          "Low": 0.0,
+          "Close": 2095.0,
           "Volume": 0.0
         }
       }
