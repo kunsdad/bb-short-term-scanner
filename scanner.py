@@ -185,7 +185,7 @@ def save_prices(conn, code, df):
 
 
 def run():
-    print('BB scan v0.4.2 started', flush=True)
+    print('BB scan v0.4.3-diagnostic started', flush=True)
     stocks = universe()
     print(f'Universe: {len(stocks)} | workers={WORKERS}', flush=True)
     now = pd.Timestamp.now(tz='Asia/Seoul')
@@ -198,6 +198,8 @@ def run():
         start = (old.index[-1] - pd.Timedelta(days=14)).strftime('%Y-%m-%d') if len(old) >= 125 else start_full
         tasks[stock.Code] = (stock, start)
     rows, errors, skipped = [], [], []
+    fetched_latest_dates = {}
+    fetched_empty = 0
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         futures = {pool.submit(fetch_one, code, start): code for code, (_, start) in tasks.items()}
         for idx, future in enumerate(as_completed(futures), 1):
@@ -205,6 +207,10 @@ def run():
             stock, _ = tasks[code]
             try:
                 fresh = future.result()
+                if fresh is None or fresh.empty:
+                    fetched_empty += 1
+                else:
+                    fetched_latest_dates[str(pd.to_datetime(fresh.index.max()).date())] = fetched_latest_dates.get(str(pd.to_datetime(fresh.index.max()).date()), 0) + 1
                 save_prices(conn, code, fresh)
                 conn.commit()
                 d = cached_frame(conn, code)
@@ -229,6 +235,10 @@ def run():
     if data.empty:
         raise RuntimeError('분석 결과 0건: 이전 latest.csv는 덮어쓰지 않았습니다.')
     dates = data['date'].value_counts().to_dict()
+    today_kst = now.date().isoformat()
+    newest_fetched = max(fetched_latest_dates, default=None)
+    if newest_fetched != today_kst and now.weekday() < 5 and now.hour >= 16:
+        print(f'WARNING: No current-date quotes fetched. KST today={today_kst}; newest fetched={newest_fetched}; source date distribution={fetched_latest_dates}; empty={fetched_empty}', flush=True)
     latest_day = max(dates)
     # Historical or stale rows are for observation only, never fresh buy signals.
     stale = data['date'] != latest_day
@@ -248,10 +258,13 @@ def run():
         'historical_only': sum(not bool(x.get('bad_price_on_latest_day')) for x in price_diagnostics),
     }
     (OUT/'status.json').write_text(json.dumps({
-        'version':'0.4.2', 'updated_at':now.isoformat(), 'universe':len(stocks),
+        'version':'0.4.3-diagnostic', 'updated_at':now.isoformat(), 'universe':len(stocks),
         'processed':len(rows), 'errors':len(errors), 'skipped':len(skipped),
         'skip_reason_counts':reason_counts, 'price_diagnostic_summary':price_summary,
         'date_counts':dates, 'latest_data_date':latest_day,
+        'scan_date_kst':today_kst, 'source_latest_date':newest_fetched,
+        'source_date_counts':fetched_latest_dates, 'source_empty_responses':fetched_empty,
+        'current_day_data_available':bool(newest_fetched == today_kst),
         'eligible':int(data['eligible'].sum()), 'workers':WORKERS,
         'note':'0 OHLC·0 거래량 기록은 최근 20개 기록 밖에서만 제거. 거래정지/재개 종목은 별도 검증 필요. 최신 날짜는 종목 데이터 중 최대 날짜 기준이며 공식 거래일 검증은 별도 필요. 업종 상대강도 미측정.'
     },ensure_ascii=False,indent=2),encoding='utf-8')
