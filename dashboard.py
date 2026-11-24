@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import sqlite3
 import pandas as pd
 import streamlit as st
 
@@ -122,6 +123,67 @@ if not filtered.empty:
     st.write('**제외 사유:**', item.get('exclusion_reason') or '없음')
     st.write('**데이터 품질:**', item.get('data_quality') or '미표시')
     st.write('**업종 상대강도:**', item.get('sector_strength') or '미측정')
+
+    st.markdown('### 📊 가격·기술지표 차트')
+    db_path = DATA / 'history.sqlite'
+    if not db_path.exists():
+        st.warning('data/history.sqlite 파일이 없습니다. GitHub 저장소에 저장되어 있는지 확인하세요.')
+    else:
+        @st.cache_data(ttl=300, show_spinner=False)
+        def load_price_history(db_file, db_stamp, code):
+            with sqlite3.connect(db_file) as conn:
+                return pd.read_sql_query(
+                    'SELECT date, open, high, low, close, volume FROM '
+                    '(SELECT date, open, high, low, close, volume FROM prices '
+                    'WHERE code = ? ORDER BY date DESC LIMIT 300) ORDER BY date ASC',
+                    conn, params=(str(code).zfill(6),)
+                )
+
+        try:
+            hist = load_price_history(str(db_path), db_path.stat().st_mtime, item['code'])
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            st.error(f'과거 가격 데이터 조회 실패: {exc}')
+            hist = pd.DataFrame()
+        if hist.empty:
+            st.info('선택한 종목의 과거 가격 기록이 없습니다.')
+        else:
+            hist['date'] = pd.to_datetime(hist['date'], errors='coerce')
+            for pcol in ['open', 'high', 'low', 'close', 'volume']:
+                hist[pcol] = pd.to_numeric(hist[pcol], errors='coerce')
+            hist = hist.dropna(subset=['date']).sort_values('date').drop_duplicates('date')
+            # Invalid OHLC is not treated as a real traded session.
+            valid = (hist[['open','high','low','close']] > 0).all(axis=1) & (hist['volume'] > 0)
+            invalid_count = int((~valid).sum())
+            clean = hist.loc[valid].copy()
+            if invalid_count:
+                st.caption(f'비정상 OHLC 또는 거래량 0 기록 {invalid_count}개를 지표 계산에서 제외했습니다. 거래정지·비거래 여부는 별도 확인이 필요합니다.')
+            if len(clean) < 20:
+                st.warning('정상 가격 기록이 20개 미만이므로 기술지표 차트를 표시할 수 없습니다.')
+            else:
+                clean = clean.set_index('date')
+                for n in [5,20,60,120]:
+                    clean[f'MA{n}'] = clean['close'].rolling(n, min_periods=n).mean()
+                std = clean['close'].rolling(20, min_periods=20).std(ddof=0)
+                clean['BB 상단'] = clean['MA20'] + 2 * std
+                clean['BB 하단'] = clean['MA20'] - 2 * std
+                diff = clean['close'].diff()
+                gain = diff.clip(lower=0).ewm(alpha=1/14, adjust=False, min_periods=14).mean()
+                loss = (-diff.clip(upper=0)).ewm(alpha=1/14, adjust=False, min_periods=14).mean()
+                rs = gain / loss.replace(0, float('nan'))
+                clean['RSI(14)'] = (100 - 100/(1+rs)).where(loss.ne(0), 100)
+                clean.loc[gain.eq(0) & loss.eq(0), 'RSI(14)'] = 50
+                window = st.select_slider('차트 표시 기간 (정상 거래 기록)', options=[40,60,120,200], value=120, key='chart_window')
+                view = clean.tail(window)
+                price_cols = ['close','BB 상단','BB 하단','MA5','MA20','MA60','MA120']
+                chart = view[price_cols].rename(columns={'close':'종가'})
+                st.line_chart(chart, height=380, use_container_width=True)
+                st.caption('볼린저밴드: 20기간, 표준편차 2배 · 이동평균선: 정상 가격 기록 기준. 가격 조정·거래정지 이후 데이터는 별도 확인 필요.')
+                st.markdown('**RSI(14)**')
+                st.line_chart(view[['RSI(14)']], height=190, use_container_width=True)
+                st.markdown('**거래량**')
+                st.bar_chart(view[['volume']].rename(columns={'volume':'거래량'}), height=190, use_container_width=True)
+                st.caption('목표가와 손절 기준가는 위 종목 상세 지표에 표시된 스캐너 계산값을 사용합니다. 차트의 재계산 지표와 스캐너 값은 데이터 정제 방식에 따라 다를 수 있습니다.')
+
 
 with st.expander('판정 기준과 한계'):
     st.markdown('''- **신규 후보**: 스캐너에서 `eligible=True`로 판정된 종목만 표시합니다.\n- **관심 후보**: 7점 이상이지만 신규 후보가 아닌 종목입니다. 거래대금 부족 등 제외 사유를 반드시 확인하세요.\n- **관찰 후보**: 6점 이상 7점 미만 종목입니다. 매수 신호를 뜻하지 않습니다.\n- **목표가/손절가**: 스캐너 계산값을 그대로 표시합니다. 값이 없으면 임의로 만들지 않습니다.\n- **미구현**: 업종 상대강도, 공식 거래일 검증, 자동 수동 입력 동기화, 매물대 계산.\n- **시세**: GitHub Actions 마지막 실행 기준 종가 데이터이며 실시간이 아닙니다.''')
