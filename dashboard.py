@@ -1,6 +1,8 @@
 from pathlib import Path
 import json
 import sqlite3
+import io
+import urllib.request
 import pandas as pd
 import altair as alt
 import streamlit as st
@@ -11,23 +13,49 @@ st.set_page_config(page_title='BB 단기전략 대시보드', page_icon='📈', 
 st.title('📈 BB 단기전략 | 국내 주식 대시보드')
 st.caption('종가 기반 관찰 도구 · 실시간 시세가 아니며 매수 권유가 아닙니다. 업종 상대강도는 아직 미측정입니다.')
 
-@st.cache_data(ttl=300)
-def load_data(path, stamp):
+# GitHub의 main 브랜치에서 최신 스캔 결과를 직접 읽습니다.
+# 로컬 파일은 네트워크 장애 시에만 사용하며, 이때 화면에 경고를 표시합니다.
+RAW_BASE = 'https://raw.githubusercontent.com/kunsdad/bb-short-term-scanner/main/data/'
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_remote(filename):
+    request = urllib.request.Request(RAW_BASE + filename,
+        headers={'User-Agent': 'BB-Dashboard/4.0', 'Cache-Control': 'no-cache'})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return response.read()
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_local_csv(path, stamp):
     return pd.read_csv(path, dtype={'code': str}, encoding='utf-8-sig')
 
 csv_path = DATA / 'latest.csv'
-if not csv_path.exists():
-    st.error('data/latest.csv 파일이 없습니다. GitHub Actions 스캔 결과가 저장됐는지 확인하세요.')
-    st.stop()
+status_path = DATA / 'status.json'
+remote_ok = False
 try:
-    df = load_data(str(csv_path), csv_path.stat().st_mtime)
+    df = pd.read_csv(io.BytesIO(fetch_remote('latest.csv')),
+                     dtype={'code': str}, encoding='utf-8-sig')
+    status = json.loads(fetch_remote('status.json').decode('utf-8-sig'))
+    remote_ok = True
 except Exception as exc:
-    st.error(f'CSV 읽기 실패: {exc}')
-    st.stop()
+    st.warning(f'GitHub 최신 데이터 조회 실패: {exc}. 로컬 파일로 대체합니다. 최신 데이터가 아닐 수 있습니다.')
+    if not csv_path.exists():
+        st.error('원격 조회에 실패했고 data/latest.csv도 없습니다.')
+        st.stop()
+    try:
+        df = load_local_csv(str(csv_path), csv_path.stat().st_mtime)
+    except Exception as local_exc:
+        st.error(f'CSV 읽기 실패: {local_exc}')
+        st.stop()
+    try:
+        status = json.loads(status_path.read_text(encoding='utf-8')) if status_path.exists() else {}
+    except (ValueError, OSError):
+        status = {}
+
 if df.empty:
     st.warning('분석 결과가 비어 있습니다.')
     st.stop()
 
+st.caption('데이터 출처: ' + ('GitHub main 최신 파일 (5분 캐시)' if remote_ok else '배포된 로컬 파일 (최신 여부 확인 필요)'))
 for col in ['score','rsi','close','volume_ratio','turnover_20d','entry','target1','target2','stop','risk_reward','ma5','ma20']:
     if col in df:
         df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -37,14 +65,6 @@ for col in ['eligible','reentry','bandwalk']:
 for col in ['exclusion_reason','data_quality','name','market','code']:
     if col in df:
         df[col] = df[col].fillna('').astype(str)
-
-status = {}
-status_path = DATA / 'status.json'
-if status_path.exists():
-    try:
-        status = json.loads(status_path.read_text(encoding='utf-8'))
-    except (ValueError, OSError):
-        pass
 
 eligible = df['eligible'] if 'eligible' in df else pd.Series(False, index=df.index)
 score = df['score'] if 'score' in df else pd.Series(float('nan'), index=df.index)
@@ -127,6 +147,43 @@ if not filtered.empty:
 
     st.markdown('### 📊 가격·기술지표 차트')
     db_path = DATA / 'history.sqlite'
+    # 다운로드는 선택한 종목의 차트를 표시할 때만, 최신 DB가 필요할 때만 수행합니다.
+    # GitHub raw의 대용량 파일 다운로드가 실패하면 로컬 DB를 사용하되 경고합니다.
+    if remote_ok:
+        try:
+            with sqlite3.connect(str(db_path)) as check_conn:
+                local_db_date = check_conn.execute('SELECT MAX(date) FROM prices').fetchone()[0]
+        except sqlite3.Error:
+            local_db_date = None
+        csv_date = str(df['date'].max()) if 'date' in df else None
+        if csv_date and (not local_db_date or str(local_db_date) < csv_date):
+            @st.cache_resource(show_spinner=False)
+            def remote_history_db(version):
+                import tempfile
+                import os
+                request = urllib.request.Request(RAW_BASE + 'history.sqlite',
+                    headers={'User-Agent':'BB-Dashboard/4.0'})
+                fd, target = tempfile.mkstemp(suffix='.sqlite', prefix='bb_history_')
+                try:
+                    with os.fdopen(fd, 'wb') as out, urllib.request.urlopen(request, timeout=120) as response:
+                        while True:
+                            chunk = response.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            out.write(chunk)
+                    with sqlite3.connect(target) as conn:
+                        conn.execute('SELECT 1 FROM prices LIMIT 1').fetchone()
+                    return target
+                except Exception:
+                    if os.path.exists(target):
+                        os.remove(target)
+                    raise
+            try:
+                with st.spinner('최신 차트 데이터 다운로드 중 (첫 조회 시 약 60MB)...'):
+                    db_path = Path(remote_history_db(csv_date))
+            except Exception as exc:
+                st.warning(f'최신 차트 DB 다운로드 실패: {exc}. 차트는 이전 날짜 데이터일 수 있습니다.')
+                db_path = DATA / 'history.sqlite'
     if not db_path.exists():
         st.warning('data/history.sqlite 파일이 없습니다. GitHub 저장소에 저장되어 있는지 확인하세요.')
     else:
