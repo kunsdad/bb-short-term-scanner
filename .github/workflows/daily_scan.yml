@@ -1,31 +1,83 @@
 name: BB Daily Scanner
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 7 * * 1-5' # 16:30 KST weekdays; Korean holidays not automatically excluded
+    - cron: '30 7 * * 1-5' # 16:30 KST (primary)
+    - cron: '30 8 * * 1-5' # 17:30 KST (backup; skips if today's scan completed)
+
 permissions:
   contents: write
+
 concurrency:
   group: bb-daily-scan
   cancel-in-progress: false
+
 jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check whether backup scan is needed
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          backup = (os.environ.get('EVENT_NAME') == 'schedule'
+                    and os.environ.get('SCHEDULE') == '30 8 * * 1-5')
+          today = datetime.now(ZoneInfo('Asia/Seoul')).date()
+          run_scan = True
+          reason = 'Primary scheduled run or manual run'
+          if backup:
+              path = Path('data/status.json')
+              try:
+                  status = json.loads(path.read_text(encoding='utf-8'))
+                  stamp = datetime.fromisoformat(status['updated_at'])
+                  if stamp.tzinfo is None:
+                      raise ValueError('updated_at has no timezone')
+                  last_run = stamp.astimezone(ZoneInfo('Asia/Seoul')).date()
+                  if last_run == today:
+                      run_scan = False
+                      reason = f'Backup skipped: scan already completed on {today}'
+                  else:
+                      reason = f'Backup running: last completed scan was {last_run}'
+              except (OSError, ValueError, KeyError, TypeError) as exc:
+                  reason = f'Backup running: no valid completion timestamp ({exc})'
+          print(reason)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f'run_scan={str(run_scan).lower()}\n')
+          PY
+
       - uses: actions/setup-python@v5
+        if: steps.check.outputs.run_scan == 'true'
         with:
           python-version: '3.11'
           cache: pip
+
       - name: Install dependencies
+        if: steps.check.outputs.run_scan == 'true'
         run: pip install -r requirements.txt
+
       - name: Run BB scanner
+        if: steps.check.outputs.run_scan == 'true'
         env:
           PYTHONUNBUFFERED: '1'
           BB_WORKERS: '4'
         run: python -u scanner.py
+
       - name: Save results and history
+        if: steps.check.outputs.run_scan == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
