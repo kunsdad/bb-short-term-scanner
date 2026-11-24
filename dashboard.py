@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import sqlite3
 import pandas as pd
+import altair as alt
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
@@ -172,17 +173,74 @@ if not filtered.empty:
                 rs = gain / loss.replace(0, float('nan'))
                 clean['RSI(14)'] = (100 - 100/(1+rs)).where(loss.ne(0), 100)
                 clean.loc[gain.eq(0) & loss.eq(0), 'RSI(14)'] = 50
-                window = st.select_slider('차트 표시 기간 (정상 거래 기록)', options=[40,60,120,200], value=120, key='chart_window')
-                view = clean.tail(window)
-                price_cols = ['close','BB 상단','BB 하단','MA5','MA20','MA60','MA120']
-                chart = view[price_cols].rename(columns={'close':'종가'})
-                st.line_chart(chart, height=380, use_container_width=True)
-                st.caption('볼린저밴드: 20기간, 표준편차 2배 · 이동평균선: 정상 가격 기록 기준. 가격 조정·거래정지 이후 데이터는 별도 확인 필요.')
+                # Signals are chart annotations, not replacements for scanner eligibility.
+                clean['하단 터치'] = (clean['low'] <= clean['BB 하단']) & clean['BB 하단'].notna()
+                clean['밴드 재진입'] = ((clean['close'].shift(1) < clean['BB 하단'].shift(1)) &
+                                      (clean['close'] >= clean['BB 하단']) & clean['BB 하단'].notna())
+                window = st.select_slider('차트 표시 기간 (정상 거래 기록)', options=[20,60,120,200], value=120, key='chart_window')
+                view = clean.tail(window).reset_index()
+                view['상승'] = view['close'] >= view['open']
+                view['캔들색'] = view['상승'].map({True:'상승', False:'하락'})
+                # A single hover target for each day, shared by candle and overlays.
+                tooltip = [alt.Tooltip('date:T', title='날짜', format='%Y-%m-%d'),
+                           alt.Tooltip('open:Q', title='시가', format=',.0f'),
+                           alt.Tooltip('high:Q', title='고가', format=',.0f'),
+                           alt.Tooltip('low:Q', title='저가', format=',.0f'),
+                           alt.Tooltip('close:Q', title='종가', format=',.0f'),
+                           alt.Tooltip('volume:Q', title='거래량', format=',.0f')]
+                base = alt.Chart(view).encode(x=alt.X('date:T', title=None, axis=alt.Axis(format='%m/%d', labelAngle=0)))
+                colors = alt.Scale(domain=['상승','하락'], range=['#d94b4b','#3675c9'])
+                wick = base.mark_rule(size=1.4).encode(y=alt.Y('low:Q', title='가격 (원)', scale=alt.Scale(zero=False)),
+                                                        y2='high:Q', color=alt.Color('캔들색:N', scale=colors, legend=None), tooltip=tooltip)
+                body = base.mark_bar(size=5).encode(y='open:Q', y2='close:Q',
+                                                    color=alt.Color('캔들색:N', scale=colors, legend=None), tooltip=tooltip)
+                layers = [wick, body]
+                line_styles = [('BB 상단','#9c70cc'),('BB 하단','#9c70cc'),('MA5','#e3a321'),
+                               ('MA20','#248b80'),('MA60','#687eaa'),('MA120','#777777')]
+                line_selection = st.multiselect('차트 보조선', [x[0] for x in line_styles],
+                                                default=[x[0] for x in line_styles], key='chart_lines')
+                for name, color in line_styles:
+                    if name in line_selection:
+                        layers.append(base.mark_line(color=color, strokeWidth=1.5,
+                                                     strokeDash=[5,3] if name.startswith('BB') else [1,0]).encode(
+                            y=alt.Y(f'{name}:Q', title='가격 (원)'),
+                            tooltip=[alt.Tooltip('date:T', title='날짜', format='%Y-%m-%d'),
+                                     alt.Tooltip(f'{name}:Q', title=name, format=',.0f')]))
+                levels = [('entry','진입 기준가','#c48a12'),('target1','1차 목표가','#248b80'),
+                          ('target2','2차 목표가','#1673aa'),('stop','손절 기준가','#cc4646')]
+                show_levels = st.checkbox('매매 기준선 표시 (스캐너 계산값)', value=True, key='chart_levels')
+                if show_levels:
+                    for key, label, color in levels:
+                        value = pd.to_numeric(item.get(key), errors='coerce')
+                        if pd.notna(value) and float(value)>0:
+                            rule_df = pd.DataFrame({'level':[float(value)]})
+                            layers.append(alt.Chart(rule_df).mark_rule(color=color, strokeWidth=1.7, strokeDash=[7,4]).encode(
+                                y=alt.Y('level:Q', title='가격 (원)'),
+                                tooltip=[alt.Tooltip('level:Q', title=label, format=',.0f')]))
+                show_signals = st.checkbox('하단 밴드 터치·재진입 표시', value=True, key='chart_signals')
+                if show_signals:
+                    for flag, color, shape in [('하단 터치','#e4a12c','circle'),('밴드 재진입','#19a578','diamond')]:
+                        events = view.loc[view[flag]].copy()
+                        if not events.empty:
+                            layers.append(alt.Chart(events).mark_point(shape=shape, size=115, filled=True, color=color).encode(
+                                x='date:T', y='low:Q', tooltip=tooltip))
+                price_chart = alt.layer(*layers).properties(height=440).interactive(bind_y=False)
+                st.altair_chart(price_chart, use_container_width=True)
+                st.caption('빨강=양봉, 파랑=음봉 · 주황 원=하단 밴드 터치 · 초록 마름모=전일 종가 하단 이탈 후 종가 재진입. 보조선과 수평선은 서로 다른 계산 기준일 수 있습니다.')
                 st.markdown('**RSI(14)**')
-                st.line_chart(view[['RSI(14)']], height=190, use_container_width=True)
+                rsi_base = alt.Chart(view).encode(x=alt.X('date:T', title=None, axis=alt.Axis(format='%m/%d', labelAngle=0)))
+                rsi_line = rsi_base.mark_line(color='#8a63c4', strokeWidth=2).encode(
+                    y=alt.Y('RSI(14):Q', title='RSI', scale=alt.Scale(domain=[0,100])),
+                    tooltip=[alt.Tooltip('date:T', title='날짜', format='%Y-%m-%d'),alt.Tooltip('RSI(14):Q', title='RSI', format='.1f')])
+                rsi_rules = alt.Chart(pd.DataFrame({'level':[30,40,70]})).mark_rule(color='#999999',strokeDash=[4,4]).encode(y='level:Q')
+                st.altair_chart((rsi_line+rsi_rules).properties(height=170),use_container_width=True)
                 st.markdown('**거래량**')
-                st.bar_chart(view[['volume']].rename(columns={'volume':'거래량'}), height=190, use_container_width=True)
-                st.caption('목표가와 손절 기준가는 위 종목 상세 지표에 표시된 스캐너 계산값을 사용합니다. 차트의 재계산 지표와 스캐너 값은 데이터 정제 방식에 따라 다를 수 있습니다.')
+                vol_chart = alt.Chart(view).mark_bar().encode(
+                    x=alt.X('date:T', title=None, axis=alt.Axis(format='%m/%d', labelAngle=0)),
+                    y=alt.Y('volume:Q', title='거래량'),
+                    color=alt.Color('캔들색:N', scale=colors, legend=None),tooltip=tooltip).properties(height=170)
+                st.altair_chart(vol_chart,use_container_width=True)
+                st.caption('비정상 OHLC·거래량 0 기록은 제외했습니다. 종목별 재계산 지표는 스캐너 수치와 다를 수 있으며, 과거 신호는 매수 추천이 아닙니다.')
 
 
 with st.expander('판정 기준과 한계'):
