@@ -51,11 +51,55 @@ except Exception as exc:
     except (ValueError, OSError):
         status = {}
 
+# Historical snapshots are actual archived scanner outputs, not back-calculations.
+# A missing date is never substituted with another day's scores.
+archive_dates = []
+try:
+    archive_index = json.loads(fetch_remote('snapshots/index.json').decode('utf-8-sig'))
+    archive_dates = sorted({d for d in archive_index.get('dates', [])
+                            if isinstance(d, str) and d >= '2026-11-23'})
+except Exception:
+    local_index = DATA / 'snapshots' / 'index.json'
+    if local_index.exists():
+        try:
+            archive_dates = sorted(set(json.loads(local_index.read_text(encoding='utf-8')).get('dates', [])))
+        except (ValueError, OSError):
+            pass
+
+current_day = str(df['date'].max()) if 'date' in df and not df.empty else ''
+known_days = sorted(set(archive_dates + ([current_day] if current_day >= '2026-11-23' else [])))
+if not known_days:
+    st.error('조회할 수 있는 스캔 날짜가 없습니다.')
+    st.stop()
+
+st.subheader('📅 과거 날짜 조회')
+selected_day = st.selectbox('조회 기준일 (저장된 스캔 결과가 있는 날만 선택 가능)',
+                            options=list(reversed(known_days)), index=0,
+                            key='historical_scan_day')
+if selected_day != current_day:
+    try:
+        df = pd.read_csv(io.BytesIO(fetch_remote(f'snapshots/{selected_day}.csv')),
+                         dtype={'code': str}, encoding='utf-8-sig')
+        snapshot_source = 'GitHub 보관 스캔 결과'
+    except Exception as exc:
+        local_snapshot = DATA / 'snapshots' / f'{selected_day}.csv'
+        if not local_snapshot.exists():
+            st.error(f'{selected_day} 스캔 원본을 가져오지 못했습니다: {exc}. 다른 날짜를 선택해 주세요.')
+            st.stop()
+        df = load_local_csv(str(local_snapshot), local_snapshot.stat().st_mtime)
+        snapshot_source = '로컬 보관 스캔 결과 (원격 조회 실패)'
+else:
+    snapshot_source = '최신 스캔 결과' if remote_ok else '로컬 최신 스캔 결과'
+
+if df.empty or 'date' not in df or str(df['date'].max()) != selected_day:
+    st.error('선택한 날짜와 보관 파일의 데이터 날짜가 일치하지 않습니다. 표시를 중단합니다.')
+    st.stop()
+st.caption(f'조회 기준일: {selected_day} · {snapshot_source} · 과거 점수/후보는 저장된 당시 스캔 결과입니다.')
 if df.empty:
     st.warning('분석 결과가 비어 있습니다.')
     st.stop()
 
-st.caption('데이터 출처: ' + ('GitHub main 최신 파일 (5분 캐시)' if remote_ok else '배포된 로컬 파일 (최신 여부 확인 필요)'))
+st.caption('데이터 갱신: GitHub 최신 파일 5분 캐시 · 과거 조회는 날짜별 보관 CSV 사용')
 for col in ['score','rsi','close','volume_ratio','turnover_20d','entry','target1','target2','stop','risk_reward','ma5','ma20']:
     if col in df:
         df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -76,7 +120,7 @@ cols[2].metric('신규 후보', f'{int(eligible.sum()):,}')
 cols[3].metric('7점 이상', f'{int((score >= 7).sum()):,}')
 cols[4].metric('6~7점 관찰', f'{int(((score >= 6) & (score < 7)).sum()):,}')
 if status:
-    st.caption(f"스캐너 v{status.get('version','?')} · 전체 {status.get('universe','?')}종목 · 제외 {status.get('skipped','?')}종목 · 오류 {status.get('errors','?')}건 · 업데이트 {status.get('updated_at','미확인')}")
+    st.caption(f"최근 스캔 상태 (조회일과 별개) · 스캐너 v{status.get('version','?')} · 전체 {status.get('universe','?')}종목 · 제외 {status.get('skipped','?')}종목 · 오류 {status.get('errors','?')}건 · 업데이트 {status.get('updated_at','미확인')}")
 
 st.subheader('검색 및 필터')
 f1, f2, f3, f4 = st.columns([2, 2, 1, 1])
@@ -202,6 +246,8 @@ if not filtered.empty:
         except (sqlite3.Error, OSError, ValueError) as exc:
             st.error(f'과거 가격 데이터 조회 실패: {exc}')
             hist = pd.DataFrame()
+        if not hist.empty:
+            hist = hist.loc[hist['date'].astype(str) <= selected_day].copy()
         if hist.empty:
             st.info('선택한 종목의 과거 가격 기록이 없습니다.')
         else:
@@ -283,7 +329,7 @@ if not filtered.empty:
                                 x='date:T', y='low:Q', tooltip=tooltip))
                 price_chart = alt.layer(*layers).properties(height=440).interactive(bind_y=False)
                 st.altair_chart(price_chart, use_container_width=True)
-                st.caption('빨강=양봉, 파랑=음봉 · 주황 원=하단 밴드 터치 · 초록 마름모=전일 종가 하단 이탈 후 종가 재진입. 보조선과 수평선은 서로 다른 계산 기준일 수 있습니다.')
+                st.caption(f'차트 종료일: {selected_day} · 빨강=양봉, 파랑=음봉 · 주황 원=하단 밴드 터치 · 초록 마름모=밴드 재진입. 수평선은 선택한 날짜의 보관 스캔 결과입니다.')
                 st.markdown('**RSI(14)**')
                 rsi_base = alt.Chart(view).encode(x=alt.X('date:T', title=None, axis=alt.Axis(format='%m/%d', labelAngle=0)))
                 rsi_line = rsi_base.mark_line(color='#8a63c4', strokeWidth=2).encode(
@@ -301,4 +347,5 @@ if not filtered.empty:
 
 
 with st.expander('판정 기준과 한계'):
-    st.markdown('''- **신규 후보**: 스캐너에서 `eligible=True`로 판정된 종목만 표시합니다.\n- **관심 후보**: 7점 이상이지만 신규 후보가 아닌 종목입니다. 거래대금 부족 등 제외 사유를 반드시 확인하세요.\n- **관찰 후보**: 6점 이상 7점 미만 종목입니다. 매수 신호를 뜻하지 않습니다.\n- **목표가/손절가**: 스캐너 계산값을 그대로 표시합니다. 값이 없으면 임의로 만들지 않습니다.\n- **미구현**: 업종 상대강도, 공식 거래일 검증, 자동 수동 입력 동기화, 매물대 계산.\n- **시세**: GitHub Actions 마지막 실행 기준 종가 데이터이며 실시간이 아닙니다.''')
+    st.markdown('''- **과거 조회**: 실제 저장된 일별 스캔 결과만 표시합니다. 기록이 없는 날짜는 선택할 수 없습니다.
+- **신규 후보**: 스캐너에서 `eligible=True`로 판정된 종목만 표시합니다.\n- **관심 후보**: 7점 이상이지만 신규 후보가 아닌 종목입니다. 거래대금 부족 등 제외 사유를 반드시 확인하세요.\n- **관찰 후보**: 6점 이상 7점 미만 종목입니다. 매수 신호를 뜻하지 않습니다.\n- **목표가/손절가**: 스캐너 계산값을 그대로 표시합니다. 값이 없으면 임의로 만들지 않습니다.\n- **미구현**: 업종 상대강도, 공식 거래일 검증, 자동 수동 입력 동기화, 매물대 계산.\n- **시세**: GitHub Actions 마지막 실행 기준 종가 데이터이며 실시간이 아닙니다.''')
