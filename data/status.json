@@ -1,30 +1,30 @@
 {
   "version": "0.4.3-diagnostic",
-  "updated_at": "2026-11-25T17:46:49.289712+09:00",
+  "updated_at": "2026-11-26T17:44:01.819337+09:00",
   "universe": 2722,
   "processed": 2525,
   "errors": 0,
   "skipped": 197,
   "skip_reason_counts": {
-    "최신 시세/거래량 비정상": 113,
+    "최신 시세/거래량 비정상": 114,
     "125거래일 미만": 51,
-    "최근 20거래기록 내 비정상 시세": 32,
+    "최근 20거래기록 내 비정상 시세": 31,
     "비거래일로 분류 불가한 가격 이상": 1
   },
   "price_diagnostic_summary": {
     "affected_symbols": 138,
-    "recovered_historical_symbols": 89,
-    "latest_day_affected": 112,
-    "historical_only": 26
+    "recovered_historical_symbols": 91,
+    "latest_day_affected": 114,
+    "historical_only": 24
   },
   "date_counts": {
-    "2026-11-25": 2525
+    "2026-11-26": 2525
   },
-  "latest_data_date": "2026-11-25",
-  "scan_date_kst": "2026-11-25",
-  "source_latest_date": "2026-11-25",
+  "latest_data_date": "2026-11-26",
+  "scan_date_kst": "2026-11-26",
+  "source_latest_date": "2026-11-26",
   "source_date_counts": {
-    "2026-11-25": 2722
+    "2026-11-26": 2722
   },
   "source_empty_responses": 0,
   "current_day_data_available": true,
